@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using SP=Microsoft.SharePoint.Client;
 
@@ -12,6 +13,8 @@ namespace spList2csv
     {
         private const int BatchSize = 1000;
         private const string separator = ";";
+        private static readonly Regex rxEoLT = new Regex(@"\t|\n|\r", RegexOptions.Multiline | RegexOptions.Compiled);
+        private static readonly Regex rxSpaces = new Regex(@"\s{2,}", RegexOptions.Multiline | RegexOptions.Compiled);
         static void Main(string[] args)
         {
             SP.ClientContext context = null;
@@ -135,7 +138,8 @@ Example: spList2csv http://team/workgroups/blabla ""My Data List Name"" ""c:\tes
                 }
                 else if (o is DateTime)
                 {
-                    ret = ((DateTime)o).ToString("yyyy/MM/dd HH:mm");
+                    var dat = ((DateTime)o);
+                    ret = dat.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
                 }
                 else if (o is string)
                 {
@@ -150,6 +154,9 @@ Example: spList2csv http://team/workgroups/blabla ""My Data List Name"" ""c:\tes
                 {
                     ret = ret.Replace("\"", string.Empty);
                 }
+
+                if (rxEoLT.IsMatch(ret)) ret = rxEoLT.Replace(ret, " ");
+                if (rxSpaces.IsMatch(ret)) ret = rxSpaces.Replace(ret, " ");
 
                 if (ret.Contains(separator))
                 {
@@ -172,26 +179,33 @@ Example: spList2csv http://team/workgroups/blabla ""My Data List Name"" ""c:\tes
         private static List<SP.Field> getFields(SP.ClientContext context, SP.List l)
         {
             var ret = new List<SP.Field>();
-            ret.Add(getFieldByName(context, l, "Title"));
-            ret.Add(getFieldByName(context, l, "Created By"));
-            ret.Add(getFieldByName(context, l, "Created"));
-            ret.Add(getFieldByName(context, l, "Modified"));
-            ret.Add(getFieldByName(context, l, "Modified By"));
+
+            var olFld1 = getFieldByName(context, l, "Title"); if (olFld1 != null) ret.Add(olFld1);
+            var olFld2 = getFieldByName(context, l, "Created By"); if (olFld2 != null) ret.Add(olFld2);
+            var olFld3 = getFieldByName(context, l, "Created"); if (olFld3 != null) ret.Add(olFld3);
+            var olFld4 = getFieldByName(context, l, "Modified"); if (olFld4 != null) ret.Add(olFld4);
+            var olFld5 = getFieldByName(context, l, "Modified By"); if (olFld5 != null) ret.Add(olFld5);
 
             var fldsq = context.LoadQuery(l.Fields.Where(x => !x.FromBaseType));
             context.ExecuteQuery();
             if (fldsq.Count() > 0) ret.AddRange(fldsq);
-
-
 
             return ret;
         }
 
         private static SP.Field getFieldByName(SP.ClientContext context, SP.List l, string fldName)
         {
-            var fld = l.Fields.GetByTitle(fldName);
-            context.Load(fld);
-            context.ExecuteQuery();
+            SP.Field fld = null;
+            try
+            {
+                fld = l.Fields.GetByInternalNameOrTitle(fldName);
+                context.Load(fld);
+                context.ExecuteQuery();
+            }
+            catch 
+            {
+                fld = null;
+            }
             return fld;
         }
 
