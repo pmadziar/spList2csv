@@ -78,8 +78,8 @@ Example: spList2csv http://team/workgroups/blabla ""My Data List Name"" ""c:\tes
                     if (count > 0) allItms.AddRange(itms);
                     position = itms.ListItemCollectionPosition;
                     q.ListItemCollectionPosition = position;
-                    cc++;
-                    Console.WriteLine("Read {0} items from Sharepoint", cc * BatchSize);
+                    cc+=count;
+                    Console.WriteLine("Read {0} items from Sharepoint", cc);
                 } while (position != null);
 
                 //save data
